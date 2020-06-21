@@ -7,9 +7,10 @@
 const router = require("express").Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const auth = require("../middleware/auth");
 const User = require("../models/userModel");
 
-// Create post request 
+// Create post request to register a user
 // "/register" is the url
 // When ever you make an HTTP request, you must pass into the callback the request and response
 // req.body will create the 4 variables with the information in the objects of the database
@@ -29,15 +30,15 @@ router.post("/register", async (req, res) => {
         
 
             if (!email || !password || !passwordCheck)
-                return res.status(400).json({msg: "Must enter all required fields"});
+                return res.status(400).json({msg: "Must enter all required fields."});
             if (password.length < 5)
-                return res.status(400).json({msg: "Password requires a minimum of 5 characters"});
+                return res.status(400).json({msg: "Password requires a minimum of 5 characters."});
             if (password !== passwordCheck)
-                return res.status(400).json({msg: "Passwords do not match. Please enter the same password twice"});
+                return res.status(400).json({msg: "Passwords do not match. Please enter the same password twice."});
 
         const existingUser = await User.findOne({email: email}); 
             if (existingUser) 
-                return res.status(400).json({msg: "An account with this email aleady exists"});
+                return res.status(400).json({msg: "An account with this email aleady exists."});
 
             if (!displayName)
                 displayName = email;    
@@ -60,23 +61,25 @@ router.post("/register", async (req, res) => {
         }
 });
 
+// Create a post request to login a user
+
 router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
 
         // Set up validations (must require all fields to be entered, if an email does exist in the database the user recieves an error message, and use bcrypt to compare if the entered password matches the user password that is stored in the database)
-        // Set up JWT
+        // Set up JWT. Be sure to add a JWT_SECRET password in the '.env' file
 
         if (!email || !password)
-            return res.status(400).json({msg: "Must enter all required fields"});
+            return res.status(400).json({msg: "Must enter all required fields."});
         
         const user = await User.findOne({ email: email });
             if (!user)
-                return res.status(400).json({msg: "No account with this email has been registered"});
+                return res.status(400).json({msg: "No account with this email has been registered."});
 
         const passwordMatch = await bcrypt.compare(password, user.password);
             if (!passwordMatch)
-                return res.status(400).json({ msg: "Invalid credentials" });
+                return res.status(400).json({ msg: "Invalid credentials." });
             
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
             res.json({
@@ -90,6 +93,36 @@ router.post("/login", async (req, res) => {
 
     }   catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Create a delete request to delete a user account
+
+router.delete("/delete", auth, async (req, res) => {
+    try {
+        const deletedUser = await User.findByIdAndDelete(req.user);
+        res.json(deletedUser);
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+});
+
+// Create a post request that checks if token and user are verified, if so, output 'true', else output 'false' 
+
+router.post("/tokenIsValid", async (req, res) => {
+    try {
+        const token = req.header("x-auth-token")
+        if (!token) return res.json(false);
+
+        const verified = jwt.verify(token, process.env.JWT_SECRET)
+        if (!verified) return res.json(false);
+
+        const user = await User.findById(verified.id);
+        if (!user) return res.json(false);
+
+        return res.json(true);
+    }   catch (err) {
+        res.status(500).json({ error: err.message })
     }
 });
 

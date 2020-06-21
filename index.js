@@ -1,4 +1,4 @@
-// set up the requirements 
+// set up the main requirements (express, mongoose, cors, dotenv)
 
 const express = require("express");
 const mongoose = require("mongoose");
